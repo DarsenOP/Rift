@@ -23,27 +23,15 @@ jobs:
         cache: true
         cache-dependency-path: go.sum
 
-    # Step 3: Cache Go module downloads
-    - name: Cache Go Modules
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ github.ref }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ github.ref }}-
-          ${{ runner.os }}-go-
-
-    # Step 4: Cache installed tools specifically
-    - name: Cache Go Tools
+    # Step 3: Cache installed tools - USING FRESH KEY
+    - name: Cache Go tools
       uses: actions/cache@v3
       id: tools-cache
       with:
         path: ~/go/bin
-        key: ${{ runner.os }}-go-tools-${{ github.ref }}-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-tools-${{ hashFiles('**/go.sum') }}
 
-    # Step 5: Install the necessary tools ONLY if not cached
+    # Step 4: Install the necessary tools ONLY if not cached
     - name: Install tools
       if: steps.tools-cache.outputs.cache-hit != 'true'
       run: |
