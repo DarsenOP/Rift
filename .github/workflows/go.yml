@@ -14,14 +14,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # Step 2: Set up the desired version of Go
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.22'
+        # This enables caching for the Go module cache (GOMODCACHE)
         cache: true
         cache-dependency-path: go.sum
 
+    # Step 3: Cache installed tools
+    - name: Cache Go Tools
+      uses: actions/cache@v3
+      id: tools-cache
+      with:
+        path: |
+          ~/go/bin
+          ~/go/pkg/mod
+        # A static key for the tools we want to install.
+        # This cache will be invalidated if the key (the tool versions) changes.
+        key: ${{ runner.os }}-go-tools-v1-${{ hashFiles('**/go.mod') }}
+
+    # Step 4: Install the necessary tools ONLY if not cached
     - name: Install tools
+      # Run this step only if the cache did NOT hit (if it hit, the tools are already in ~/go/bin)
+      if: steps.tools-cache.outputs.cache-hit != 'true'
       run: |
         go install mvdan.cc/gofumpt@latest
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
