@@ -1,0 +1,35 @@
+# .golangci.yml
+
+# This is the minimal, effective setup for a new project.
+# It focuses on catching bugs and common mistakes, not style opinions.
+
+linters:
+  # Disable all linters first, then only enable the ones we want.
+  disable-all: true
+  enable:
+    - govet       # Official Go analyzer: finds bugs, shadows, unused args. **ESSENTIAL**.
+    - staticcheck # The best static analyzer for Go. Finds bugs & performance issues.
+    - unused      # Reports unused code (functions, variables, constants).
+    - ineffassign # Reports ineffective assignments (assignments that are never used).
+    - errcheck    # Critical: Ensures every returned error is handled.
+    - typecheck   # Catches type errors that `go build` might miss.
+
+# Settings for the linters we enabled
+linters-settings:
+  govet:
+    # Enable all checks except the rarely useful 'shadow'
+    disable:
+      - shadow
+
+# Global settings for the `golangci-lint run` command
+run:
+  timeout: 3m
+  issues-exit-code: 1 # Exit with code 1 if any issues are found (fail the build)
+  tests: true # Also analyze test code
+
+issues:
+  # Don't exclude any common issues by default
+  exclude-use-default: false
+  # Show all issues, don't limit the output
+  max-issues-per-linter: 0
+  max-same-issues: 0
