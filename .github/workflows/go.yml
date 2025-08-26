@@ -1,0 +1,59 @@
+name: Go CI
+
+on:
+  push:
+    branches: [ "dev", "feat/setup" ]
+  pull_request:
+    branches: [ "dev" ]
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+        cache: true
+        cache-dependency-path: go.sum
+
+    - name: Install tools
+      run: |
+        go install mvdan.cc/gofumpt@latest
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    # Check Formatting: Only run if Go files exist
+    - name: Check Formatting
+      run: |
+        # Check if any Go files exist first
+        if find . -name '*.go' -not -path './vendor/*' | read; then
+          # Create a backup of the current state to check for changes later
+          git stash -u
+
+          # Run the formatter
+          make fmt
+
+          # Check if the formatter changed any files by comparing to the stashed state
+          if ! git diff --exit-code --staged; then
+            echo "❌ Code formatting issues found. Please run 'make fmt' locally and commit the changes."
+            git diff
+            exit 1
+          fi
+
+          # Restore the original state if no changes were made
+          git stash pop
+        else
+          echo "No Go files found, skipping formatting check."
+        fi
+
+    # Run Linter: Only run if Go files exist
+    - name: Run Linter
+      run: make lint
+
+    # Run Tests: Only run if Go test files exist
+    - name: Run Tests
+      run: make test
