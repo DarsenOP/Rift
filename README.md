@@ -1,6 +1,7 @@
 # Rift – a minimal Redis-compatible server written in Go
 
 > Phase 0 – Foundation & Setup
+
 > NOTE: This document will expand with each completed phase.
 
 ### What is Rift
@@ -30,7 +31,7 @@ make build            # produces ./rift binary
 
 ### Development
 
-See `CONTRIBUTING.md` for workflow & branching rules.
+See [CONTRIBUTING POLICY](CONTRIBUTING.md) for workflow & branching rules.
 
 ### License
-MIT – see LICENSE.
+MIT – see [LICENSE](LICENSE).
