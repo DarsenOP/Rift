@@ -13,29 +13,29 @@ func main() {
 		"pkg",
 		"scripts",
 	}
-	
+
 	requiredFiles := []string{
 		"cmd/rift/main.go",
 		"go.mod",
-		"go.sum", 
+		"go.sum",
 		"Makefile",
 		".golangci.yml",
 		".github/workflows/go.yml",
 	}
-	
+
 	allGood := true
-	
+
 	// Check directories
 	for _, dir := range requiredDirs {
 		if info, err := os.Stat(dir); os.IsNotExist(err) {
 			fmt.Printf("xxx Missing directory: %s\n", dir)
 			allGood = false
 		} else if !info.IsDir() {
-			fmt.Printf("xxx Not a directory: %s\n", dir)	
+			fmt.Printf("xxx Not a directory: %s\n", dir)
 			allGood = false
 		}
 	}
-	
+
 	// Check files
 	for _, file := range requiredFiles {
 		if info, err := os.Stat(file); os.IsNotExist(err) {
@@ -46,7 +46,7 @@ func main() {
 			allGood = false
 		}
 	}
-	
+
 	if allGood {
 		fmt.Println("--- Project structure is valid!")
 		os.Exit(0)
