@@ -5,39 +5,51 @@ GO_FILES := $(shell find . -name '*.go' -not -path './vendor/*' 2>/dev/null | he
 TEST_FILES := $(shell find . -name '*_test.go' -not -path './vendor/*' 2>/dev/null | head -1)
 MAIN_GO_FILES := $(shell find ./cmd/rift -name '*.go' -not -path './vendor/*' 2>/dev/null | head -1)
 
-.PHONY: build lint test clean fmt
+.PHONY: help build lint test clean fmt validate
 
-build:
+help:  ## Show this help message
+	@echo "Rift Build System"
+	@echo "================="
+	@echo ""
+	@echo "Available targets:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+
+build:  ## Build the rift binary
 	@if [ -z '$(MAIN_GO_FILES)' ]; then \
-	    echo "❌ Main application directory ./cmd/rift/ does not exist or contains no .go files. Cannot build."; \
-	    echo "   Creating a basic main.go structure is recommended."; \
+	    echo "xxx Main application directory ./cmd/rift/ does not exist or contains no .go files. Cannot build."; \
+	    echo "    Creating a basic main.go structure is recommended."; \
 	    exit 1; \
 	else \
-	    echo "Building $(BINARY_NAME)..."; \
+	    echo ">>> Building $(BINARY_NAME)..."; \
 	    go build -o $(BINARY_NAME) ./cmd/rift/; \
 	fi
 
-lint:
+lint:  ## Run linter (golangci-lint) - skips if no Go files
 	@if [ -z '$(GO_FILES)' ]; then \
-	    echo "No Go files found, skipping linter."; \
+	    echo "=== No Go files found, skipping linter."; \
 	else \
-	    echo "Running linter..."; \
+	    echo ">>> Running linter..."; \
 	    golangci-lint run ./...; \
 	fi
 
-test:
+test:  ## Run tests - skips if no test files
 	@if [ -z '$(TEST_FILES)' ]; then \
-	    echo "No tests found, skipping test execution."; \
+	    echo "=== No tests found, skipping test execution."; \
 	else \
-	    echo "Running tests..."; \
+	    echo ">>> Running tests..."; \
 	    go test -v -race ./...; \
 	fi
 
-fmt:
-	@echo "Formatting code..."
+fmt:  ## Format code with gofumpt
+	@echo ">>> Formatting code..."
 	gofumpt -l -w .
 
-clean:
-	@echo "Cleaning up..."
+clean:  ## Remove built artifacts and clean up
+	@echo ">>> Cleaning up..."
 	go clean
 	rm -f $(BINARY_NAME)
+
+validate: ## Validate project structure requirements
+	@echo ">>> Validating project structure..."
+	@go run scripts/validate_structure.go
