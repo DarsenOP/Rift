@@ -17,7 +17,6 @@ type Value struct {
 var ErrInvalidSyntax = errors.New("invalid syntax")
 
 func Parse(reader *bufio.Reader) (Value, error) {
-	// Start with simple string parsing: "+OK\r\n"
 	firstByte, err := reader.ReadByte()
 	if err != nil {
 		return Value{}, err
@@ -37,11 +36,9 @@ func Parse(reader *bufio.Reader) (Value, error) {
 	default:
 		return Value{}, ErrInvalidSyntax
 	}
-	// Then implement arrays: "*1\r\n$4\r\nPING\r\n"
 }
 
 func parseSimpleString(reader *bufio.Reader) (Value, error) {
-	// Read until we find \r\n
 	line, err := readLine(reader)
 	if err != nil {
 		return Value{}, err
