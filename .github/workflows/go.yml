@@ -1,0 +1,70 @@
+name: Go CI
+
+on:
+  push:
+    branches: [ "dev", "feat/setup" ]
+  pull_request:
+    branches: [ "dev" ]
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Step 2: Set up the desired version of Go
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        # This enables caching for the Go module cache (GOMODCACHE)
+        cache: true
+        cache-dependency-path: go.sum
+
+    # Step 3: Cache installed tools - USING FRESH KEY
+    - name: Cache Go tools
+      uses: actions/cache@v3
+      id: tools-cache
+      with:
+        path: ~/go/bin
+        key: ${{ runner.os }}-go-tools-${{ hashFiles('**/go.sum') }}
+
+    # Step 4: Install the necessary tools ONLY if not cached
+    - name: Install tools
+      if: steps.tools-cache.outputs.cache-hit != 'true'
+      run: |
+        go install mvdan.cc/gofumpt@latest
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    - name: Validate Project Structure
+      run: make validate
+    
+    # Check Formatting: Only run if Go files exist
+    - name: Check Formatting
+      run: |
+        # Check if any Go files exist first
+        if find . -name '*.go' -not -path './vendor/*' | read; then
+          # Run the formatter
+          make fmt
+          
+          # Check if any files were modified by the formatter
+          if ! git diff --exit-code; then
+            echo "❌ Code formatting issues found. Please run 'make fmt' locally and commit the changes."
+            echo "The following files need formatting:"
+            git diff --name-only
+            git diff  # Show the actual changes for context
+            exit 1
+          fi
+        else
+          echo "No Go files found, skipping formatting check."
+        fi
+
+    # Run Linter: Only run if Go files exist
+    - name: Run Linter
+      run: make lint
+
+    # Run Tests: Only run if Go test files exist
+    - name: Run Tests
+      run: make test
