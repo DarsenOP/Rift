@@ -38,6 +38,9 @@ jobs:
         go install mvdan.cc/gofumpt@latest
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
+    - name: Validate Project Structure
+      run: make validate
+    
     # Check Formatting: Only run if Go files exist
     - name: Check Formatting
       run: |
