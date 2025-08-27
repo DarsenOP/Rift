@@ -8,10 +8,11 @@ import (
 )
 
 type Value struct {
-	Typ   string
-	Str   string
-	Num   int
-	Array []Value
+	Typ     string
+	Str     string
+	Num     int
+	Array   []Value
+	NullTyp string
 }
 
 var ErrInvalidSyntax = errors.New("invalid syntax")
@@ -91,7 +92,7 @@ func parseBulkString(reader *bufio.Reader) (Value, error) {
 	}
 
 	if length == -1 {
-		return Value{Typ: "null"}, nil
+		return Value{Typ: "null", NullTyp: "bulk"}, nil
 	}
 
 	data := make([]byte, length)
@@ -124,7 +125,7 @@ func parseArray(reader *bufio.Reader) (Value, error) {
 	}
 
 	if count == -1 {
-		return Value{Typ: "null"}, nil
+		return Value{Typ: "null", NullTyp: "array"}, nil
 	}
 
 	if count == 0 {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +14,8 @@ import (
 
 func main() {
 	versionFlag := flag.Bool("version", false, "Print version information")
+	testParserFlag := flag.Bool("test-parser", false, "Test RESP parser")
+	testWriterFlag := flag.Bool("test-writer", false, "Test RESP writer")
 	flag.Parse()
 
 	if *versionFlag {
@@ -20,6 +23,15 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *testWriterFlag {
+		testWriter()
+	}
+	if *testParserFlag {
+		testParser()
+	}
+}
+
+func testParser() {
 	// Test cases for ALL RESP types including nested arrays
 	testInputs := []string{
 		// Simple Strings
@@ -56,8 +68,10 @@ func main() {
 		"*5\r\n+hello\r\n-err\r\n:42\r\n$5\r\nworld\r\n*2\r\n:1\r\n:2\r\n",
 	}
 
+	fmt.Println("=== TESTING RESP PARSER ===")
+
 	for _, input := range testInputs {
-		fmt.Printf("Testing: %q\n", input)
+		fmt.Printf("Input: %q\n", input)
 
 		reader := bufio.NewReader(strings.NewReader(input))
 		result, err := resp.Parse(reader)
@@ -66,7 +80,75 @@ func main() {
 			fmt.Printf("  Error: %v\n\n", err)
 		} else {
 			printValue(result, 0)
-			fmt.Println()
+
+			// Test round-trip: parse then write back
+			var buf bytes.Buffer
+			err := resp.WriteValue(&buf, result)
+			if err != nil {
+				fmt.Printf("  Round-trip error: %v\n\n", err)
+			} else {
+				fmt.Printf("  Round-trip: %q\n\n", buf.String())
+			}
+		}
+	}
+}
+
+func testWriter() {
+	fmt.Println("=== TESTING RESP WRITER ===")
+
+	// Test cases for all RESP types
+	tests := []struct {
+		name  string
+		value resp.Value
+	}{
+		{"Simple String", resp.Value{Typ: "simple", Str: "OK"}},
+		{"Error", resp.Value{Typ: "error", Str: "Error message"}},
+		{"Integer", resp.Value{Typ: "integer", Num: 42}},
+		{"Bulk String", resp.Value{Typ: "bulk", Str: "hello"}},
+		{"Empty Bulk", resp.Value{Typ: "bulk", Str: ""}},
+		{"Null", resp.Value{Typ: "null"}},
+		{
+			"PING Array",
+			resp.Value{Typ: "array", Array: []resp.Value{{Typ: "bulk", Str: "PING"}}},
+		},
+		{
+			"Mixed Array",
+			resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "simple", Str: "hello"},
+					{Typ: "error", Str: "err"},
+					{Typ: "integer", Num: 42},
+					{Typ: "bulk", Str: "world"},
+				},
+			},
+		},
+		{"Unknown Type", resp.Value{Typ: "unknown"}},
+	}
+
+	for _, tt := range tests {
+		fmt.Printf("Test: %s\n", tt.name)
+
+		var buf bytes.Buffer
+		err := resp.WriteValue(&buf, tt.value)
+
+		if err != nil {
+			fmt.Printf("  Error: %v\n\n", err)
+		} else {
+			output := buf.String()
+			fmt.Printf("  Output: %q\n", output)
+			fmt.Printf("  Human: ")
+			for _, b := range output {
+				switch b {
+				case '\r':
+					fmt.Print("\\r")
+				case '\n':
+					fmt.Print("\\n")
+				default:
+					fmt.Printf("%c", b)
+				}
+			}
+			fmt.Printf("\n\n")
 		}
 	}
 }
