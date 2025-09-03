@@ -2,7 +2,9 @@ package resp
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 )
@@ -15,7 +17,25 @@ type Value struct {
 	NullTyp string
 }
 
-var ErrInvalidSyntax = errors.New("invalid syntax")
+var (
+	ErrCRLFMissing        = errors.New("ERR protocol error: CRLF not found")
+	ErrInvalidSyntax      = errors.New("ERR Protocol error: invalid multibulk length")
+	ErrInvalidBulkLength  = errors.New("ERR Protocol error: invalid bulk length")
+	ErrInvalidArrayLength = errors.New("ERR Protocol error: invalid multibulk length")
+)
+
+func ParseRESP(reader *bufio.Reader) (Value, error) {
+	firstByte, err := reader.ReadByte()
+	if err != nil {
+		return Value{}, err
+	}
+
+	if firstByte != '*' {
+		return Value{}, fmt.Errorf("ERR Protocol error: expected '*', got '%c'", firstByte)
+	}
+
+	return ParseArray(reader)
+}
 
 func Parse(reader *bufio.Reader) (Value, error) {
 	firstByte, err := reader.ReadByte()
@@ -25,22 +45,22 @@ func Parse(reader *bufio.Reader) (Value, error) {
 
 	switch firstByte {
 	case '+':
-		return parseSimpleString(reader)
+		return ParseSimpleString(reader)
 	case '-':
-		return parseSimpleError(reader)
+		return ParseSimpleError(reader)
 	case ':':
-		return parseInteger(reader)
+		return ParseInteger(reader)
 	case '$':
-		return parseBulkString(reader)
+		return ParseBulkString(reader)
 	case '*':
-		return parseArray(reader)
+		return ParseArray(reader)
 	default:
-		return Value{}, ErrInvalidSyntax
+		return Value{}, fmt.Errorf("ERR Protocol error: expected '+', '-', ':', '$', '*', got '%c'", firstByte)
 	}
 }
 
-func parseSimpleString(reader *bufio.Reader) (Value, error) {
-	line, err := readLine(reader)
+func ParseSimpleString(reader *bufio.Reader) (Value, error) {
+	line, err := ReadLine(reader)
 	if err != nil {
 		return Value{}, err
 	}
@@ -51,8 +71,8 @@ func parseSimpleString(reader *bufio.Reader) (Value, error) {
 	}, nil
 }
 
-func parseSimpleError(reader *bufio.Reader) (Value, error) {
-	line, err := readLine(reader)
+func ParseSimpleError(reader *bufio.Reader) (Value, error) {
+	line, err := ReadLine(reader)
 	if err != nil {
 		return Value{}, err
 	}
@@ -63,8 +83,8 @@ func parseSimpleError(reader *bufio.Reader) (Value, error) {
 	}, nil
 }
 
-func parseInteger(reader *bufio.Reader) (Value, error) {
-	line, err := readLine(reader)
+func ParseInteger(reader *bufio.Reader) (Value, error) {
+	line, err := ReadLine(reader)
 	if err != nil {
 		return Value{}, err
 	}
@@ -80,15 +100,15 @@ func parseInteger(reader *bufio.Reader) (Value, error) {
 	}, nil
 }
 
-func parseBulkString(reader *bufio.Reader) (Value, error) {
-	lenStr, err := readLine(reader)
+func ParseBulkString(reader *bufio.Reader) (Value, error) {
+	lenStr, err := ReadLine(reader)
 	if err != nil {
 		return Value{}, err
 	}
 
 	length, err := strconv.Atoi(string(lenStr))
 	if err != nil {
-		return Value{}, ErrInvalidSyntax
+		return Value{}, ErrInvalidBulkLength
 	}
 
 	if length == -1 {
@@ -113,15 +133,15 @@ func parseBulkString(reader *bufio.Reader) (Value, error) {
 	}, nil
 }
 
-func parseArray(reader *bufio.Reader) (Value, error) {
-	lenStr, err := readLine(reader)
+func ParseArray(reader *bufio.Reader) (Value, error) {
+	lenStr, err := ReadLine(reader)
 	if err != nil {
 		return Value{}, err
 	}
 
 	count, err := strconv.Atoi(string(lenStr))
 	if err != nil {
-		return Value{}, ErrInvalidSyntax
+		return Value{}, ErrInvalidArrayLength
 	}
 
 	if count == -1 {
@@ -148,21 +168,17 @@ func parseArray(reader *bufio.Reader) (Value, error) {
 }
 
 // readLine reads until \r\n and returns the line without the terminator
-func readLine(reader *bufio.Reader) ([]byte, error) {
-	var line []byte
-
-	for {
-		b, err := reader.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		line = append(line, b)
-
-		// Check if we've reached \r\n
-		if len(line) >= 2 && line[len(line)-2] == '\r' && line[len(line)-1] == '\n' {
-			// Return the line without the \r\n
-			return line[:len(line)-2], nil
-		}
+func ReadLine(reader *bufio.Reader) ([]byte, error) {
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		// io.EOF with no data is fine; let caller decide.
+		return nil, err
 	}
+
+	// Must end with \r\n
+	if len(line) < 2 || line[len(line)-2] != '\r' {
+		return nil, ErrCRLFMissing
+	}
+
+	return bytes.TrimSuffix(line, []byte("\r\n")), nil
 }
