@@ -1,5 +1,7 @@
 # Makefile
-BINARY_NAME=rift
+BIN_DIR     := bin
+BINARY_NAME := rift
+BUILD_OUT   := $(BIN_DIR)/$(BINARY_NAME)
 
 GO_FILES := $(shell find . -name '*.go' -not -path './vendor/*' 2>/dev/null | head -1)
 TEST_FILES := $(shell find . -name '*_test.go' -not -path './vendor/*' 2>/dev/null | head -1)
@@ -22,7 +24,8 @@ build:  ## Build the rift binary
 	    exit 1; \
 	else \
 	    echo ">>> Building $(BINARY_NAME)..."; \
-	    go build -o $(BINARY_NAME) ./cmd/rift/; \
+			mkdir -p $(BIN_DIR); \
+	    go build -ldflags "$(LDFLAGS)" -o $(BUILD_OUT) ./cmd/rift; \
 	fi
 
 lint:  ## Run linter (golangci-lint) - skips if no Go files
@@ -48,7 +51,7 @@ fmt:  ## Format code with gofumpt
 clean:  ## Remove built artifacts and clean up
 	@echo ">>> Cleaning up..."
 	go clean
-	rm -f $(BINARY_NAME)
+	rm -rf $(BIN_DIR)
 
 validate: ## Validate project structure requirements
 	@echo ">>> Validating project structure..."
