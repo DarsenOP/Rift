@@ -139,6 +139,51 @@ func TestHandleCommand(t *testing.T) {
 			},
 			expected: resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"},
 		},
+		{
+			name: "GET missing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "GET"},
+					{Typ: "bulk", Str: "nosuch"},
+				},
+			},
+			expected: resp.Value{Typ: "null", NullTyp: "bulk"}, // $-1\r\n
+		},
+		{
+			name: "GET existing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "GET"},
+					{Typ: "bulk", Str: "mykey"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "myvalue"},
+		},
+		{
+			name: "GET wrong arity",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "GET"},
+					{Typ: "bulk", Str: "k1"},
+					{Typ: "bulk", Str: "k2"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'get' command"},
+		},
+		{
+			name: "GET non-bulk key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "GET"},
+					{Typ: "integer", Num: 123},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR argument should be a bulk string"},
+		},
 	}
 
 	for _, tt := range tests {
