@@ -324,6 +324,119 @@ func TestHandleCommand(t *testing.T) {
 	}
 }
 
+func TestTTLExpire(t *testing.T) {
+	store := storage.New()
+	defer store.Shutdown()
+
+	// seed a key
+	store.Set("k", "v")
+
+	tests := []struct {
+		name     string
+		input    resp.Value
+		expected resp.Value
+	}{
+		{
+			name: "TTL on existing key without expiry",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TTL"},
+					{Typ: "bulk", Str: "k"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: -1},
+		},
+		{
+			name: "TTL on missing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TTL"},
+					{Typ: "bulk", Str: "nosuch"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: -2},
+		},
+		{
+			name: "EXPIRE set 5 s",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXPIRE"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "5"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "EXPIRE on missing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXPIRE"},
+					{Typ: "bulk", Str: "nosuch"},
+					{Typ: "bulk", Str: "10"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "EXPIRE wrong arity",
+			input: resp.Value{
+				Typ:   "array",
+				Array: []resp.Value{{Typ: "bulk", Str: "EXPIRE"}},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'expire' command"},
+		},
+		{
+			name: "EXPIRE non-integer seconds",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXPIRE"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "abc"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR value is not an integer or out of range"},
+		},
+		{
+			name: "TTL wrong arity",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TTL"},
+					{Typ: "bulk", Str: "k1"},
+					{Typ: "bulk", Str: "k2"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'ttl' command"},
+		},
+		{
+			name: "TTL non-bulk key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TTL"},
+					{Typ: "integer", Num: 123},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR argument should be a bulk string"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HandleCommand(store, tt.input)
+			if !valuesEqual(result, tt.expected) {
+				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+}
+
 // Helper function from parser_test.go
 func valuesEqual(a, b resp.Value) bool {
 	if a.Typ != b.Typ {
