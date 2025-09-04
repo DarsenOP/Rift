@@ -33,6 +33,28 @@ func TestBasicCRUD(t *testing.T) {
 	}
 }
 
+func TestConcurrentAccess(t *testing.T) {
+	s := New()
+	const workers = 100
+	const opsPerWorker = 1000
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < opsPerWorker; j++ {
+				key := string(rune('A' + (id+j)%26))
+				s.Set(key, key)
+				s.Get(key)
+				s.Exists(key)
+				s.Del(key)
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
 func TestExpirationBlackBox(t *testing.T) {
 	s := New()
 	defer s.Shutdown()
@@ -103,24 +125,22 @@ func TestManyExpirations(t *testing.T) {
 	}
 }
 
-func TestConcurrentAccess(t *testing.T) {
+func TestExpirationRealClock(t *testing.T) {
 	s := New()
-	const workers = 100
-	const opsPerWorker = 1000
+	defer s.Shutdown()
 
-	var wg sync.WaitGroup
-	wg.Add(workers)
-	for i := 0; i < workers; i++ {
-		go func(id int) {
-			defer wg.Done()
-			for j := 0; j < opsPerWorker; j++ {
-				key := string(rune('A' + (id+j)%26))
-				s.Set(key, key)
-				s.Get(key)
-				s.Exists(key)
-				s.Del(key)
-			}
-		}(i)
+	s.Set("k", "v")
+	s.Expire("k", 50*time.Millisecond)
+
+	time.Sleep(100 * time.Millisecond) // wait > TTL + janitor tick
+
+	if _, ok := s.Get("k"); ok {
+		t.Error("key should be expired")
 	}
-	wg.Wait()
+	if s.Exists("k") {
+		t.Error("key should be expired")
+	}
+	if ttl, _ := s.TTL("k"); ttl != -2 {
+		t.Errorf("expected TTL -2, got %v", ttl)
+	}
 }
