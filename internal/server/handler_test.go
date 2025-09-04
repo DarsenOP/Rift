@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/DarsenOP/Rift/internal/resp"
+	"github.com/DarsenOP/Rift/internal/storage"
 )
 
 func TestHandleCommand(t *testing.T) {
+	store := storage.New()
+
 	tests := []struct {
 		name     string
 		input    resp.Value
@@ -91,11 +94,56 @@ func TestHandleCommand(t *testing.T) {
 			},
 			expected: resp.Value{Typ: "error", Str: "ERR command must be a bulk string"},
 		},
+		{
+			name: "SET OK",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "mykey"},
+					{Typ: "bulk", Str: "myvalue"},
+				},
+			},
+			expected: resp.Value{Typ: "simple", Str: "OK"},
+		},
+		{
+			name: "SET wrong arity (0 args)",
+			input: resp.Value{
+				Typ:   "array",
+				Array: []resp.Value{{Typ: "bulk", Str: "SET"}},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"},
+		},
+		{
+			name: "SET wrong arity (3 args)",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "v"},
+					{Typ: "bulk", Str: "extra"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"},
+		},
+		{
+			name: "SET non-bulk key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "integer", Num: 123},
+					{Typ: "bulk", Str: "v"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := HandleCommand(tt.input)
+			result := HandleCommand(store, tt.input)
 
 			if !valuesEqual(result, tt.expected) {
 				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
