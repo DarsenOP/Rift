@@ -30,6 +30,8 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleSET(store, value.Array[1:])
 	case "GET":
 		return HandleGET(store, value.Array[1:])
+	case "DEL":
+		return HandleDEL(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}
@@ -87,4 +89,24 @@ func HandleGET(store *storage.Store, args []resp.Value) resp.Value {
 	}
 
 	return resp.Value{Typ: "bulk", Str: value}
+}
+
+func HandleDEL(store *storage.Store, args []resp.Value) resp.Value {
+	if len(args) == 0 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'del' command"}
+	}
+
+	for _, arg := range args {
+		if arg.Typ != "bulk" {
+			return resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"}
+		}
+	}
+
+	deleted := 0
+	for _, arg := range args {
+		if store.Del(arg.Str) {
+			deleted++
+		}
+	}
+	return resp.Value{Typ: "integer", Num: deleted}
 }
