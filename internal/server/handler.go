@@ -69,7 +69,7 @@ func HandleCOMMAND() resp.Value {
 }
 
 func HandleSET(store *storage.Store, args []resp.Value) resp.Value {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
 	}
 
@@ -77,7 +77,44 @@ func HandleSET(store *storage.Store, args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"}
 	}
 
-	store.Set(args[0].Str, args[1].Str)
+	key, value := args[0].Str, args[1].Str
+	var ttl time.Duration
+
+	// parse optional flags
+	if len(args) > 2 {
+		if len(args) != 4 {
+			return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' with expiration"}
+		}
+
+		flag, flagVal := strings.ToUpper(args[2].Str), args[3].Str
+		if args[2].Typ != "bulk" || args[3].Typ != "bulk" {
+			return resp.Value{Typ: "error", Str: "ERR expiration flag and value must be bulk strings"}
+		}
+
+		var multiplier time.Duration
+		switch flag {
+		case "EX":
+			multiplier = time.Second
+		case "PX":
+			multiplier = time.Millisecond
+		default:
+			return resp.Value{Typ: "error", Str: "ERR unsupported option"}
+		}
+
+		n, err := strconv.Atoi(flagVal)
+		if err != nil || n <= 0 {
+			return resp.Value{Typ: "error", Str: "ERR value is not an integer or out of range"}
+		}
+		ttl = time.Duration(n) * multiplier
+	}
+
+	// atomic write
+	if ttl > 0 {
+		store.SetEX(key, value, ttl)
+	} else {
+		store.Set(key, value)
+	}
+
 	return resp.Value{Typ: "simple", Str: "OK"}
 }
 
