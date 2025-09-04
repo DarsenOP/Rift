@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/DarsenOP/Rift/internal/resp"
@@ -9,6 +10,12 @@ import (
 
 func TestHandleCommand(t *testing.T) {
 	store := storage.New()
+
+	for i := 1; i <= 10; i++ {
+		key := "k" + strconv.Itoa(i)
+		val := "v" + strconv.Itoa(i)
+		store.Set(key, val)
+	}
 
 	tests := []struct {
 		name     string
@@ -245,6 +252,60 @@ func TestHandleCommand(t *testing.T) {
 				Typ: "array",
 				Array: []resp.Value{
 					{Typ: "bulk", Str: "DEL"},
+					{Typ: "integer", Num: 123},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"},
+		},
+		{
+			name: "EXISTS one present",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXISTS"},
+					{Typ: "bulk", Str: "k3"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "EXISTS two, one missing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXISTS"},
+					{Typ: "bulk", Str: "k5"},
+					{Typ: "bulk", Str: "nosuch"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "EXISTS all missing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXISTS"},
+					{Typ: "bulk", Str: "nosuch1"},
+					{Typ: "bulk", Str: "nosuch2"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "EXISTS no arguments",
+			input: resp.Value{
+				Typ:   "array",
+				Array: []resp.Value{{Typ: "bulk", Str: "EXISTS"}},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'exists' command"},
+		},
+		{
+			name: "EXISTS non-bulk argument",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "EXISTS"},
 					{Typ: "integer", Num: 123},
 				},
 			},
