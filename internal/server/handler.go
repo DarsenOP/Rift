@@ -1,7 +1,9 @@
 package server
 
 import (
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DarsenOP/Rift/internal/resp"
 	"github.com/DarsenOP/Rift/internal/storage"
@@ -34,6 +36,10 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleDEL(store, value.Array[1:])
 	case "EXISTS":
 		return HandleEXISTS(store, value.Array[1:])
+	case "TTL":
+		return HandleTTL(store, value.Array[1:])
+	case "EXPIRE":
+		return HandleEXPIRE(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}
@@ -131,4 +137,47 @@ func HandleEXISTS(store *storage.Store, args []resp.Value) resp.Value {
 		}
 	}
 	return resp.Value{Typ: "integer", Num: count}
+}
+
+func HandleTTL(store *storage.Store, args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'ttl' command"}
+	}
+	if args[0].Typ != "bulk" {
+		return resp.Value{Typ: "error", Str: "ERR argument should be a bulk string"}
+	}
+
+	ttl, _ := store.TTL(args[0].Str)
+
+	switch ttl {
+	case -2:
+		return resp.Value{Typ: "integer", Num: -2}
+	case -1:
+		return resp.Value{Typ: "integer", Num: -1}
+	default:
+		return resp.Value{Typ: "integer", Num: int(ttl.Seconds())}
+	}
+}
+
+func HandleEXPIRE(store *storage.Store, args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'expire' command"}
+	}
+
+	if args[0].Typ != "bulk" || args[1].Typ != "bulk" {
+		return resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"}
+	}
+
+	// parse seconds
+	secs, err := strconv.Atoi(args[1].Str)
+	if err != nil || secs <= 0 {
+		return resp.Value{Typ: "error", Str: "ERR value is not an integer or out of range"}
+	}
+
+	ok := store.Expire(args[0].Str, time.Duration(secs)*time.Second)
+	if ok {
+		return resp.Value{Typ: "integer", Num: 1}
+	}
+
+	return resp.Value{Typ: "integer", Num: 0}
 }
