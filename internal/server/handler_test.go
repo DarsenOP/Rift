@@ -144,7 +144,7 @@ func TestHandleCommand(t *testing.T) {
 					{Typ: "bulk", Str: "extra"},
 				},
 			},
-			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' with expiration"},
 		},
 		{
 			name: "SET non-bulk key",
@@ -310,6 +310,62 @@ func TestHandleCommand(t *testing.T) {
 				},
 			},
 			expected: resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"},
+		},
+		{
+			name: "SET with EX seconds",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "v"},
+					{Typ: "bulk", Str: "EX"},
+					{Typ: "bulk", Str: "2"},
+				},
+			},
+			expected: resp.Value{Typ: "simple", Str: "OK"},
+		},
+		{
+			name: "SET with PX milliseconds",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "v"},
+					{Typ: "bulk", Str: "PX"},
+					{Typ: "bulk", Str: "2000"},
+				},
+			},
+			expected: resp.Value{Typ: "simple", Str: "OK"},
+		},
+		{
+			name: "SET invalid flag",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "v"},
+					{Typ: "bulk", Str: "XX"},
+					{Typ: "bulk", Str: "10"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR unsupported option"},
+		},
+		{
+			name: "SET negative TTL",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "v"},
+					{Typ: "bulk", Str: "EX"},
+					{Typ: "bulk", Str: "-1"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR value is not an integer or out of range"},
 		},
 	}
 
