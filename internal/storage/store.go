@@ -159,3 +159,10 @@ func (s *Store) TTL(key string) (time.Duration, bool) {
 
 	return left, true
 }
+
+func (s *Store) SetEX(key, value string, ttl time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[key] = value
+	s.exps[key] = time.Now().Add(ttl)
+}
