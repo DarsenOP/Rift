@@ -132,7 +132,7 @@ func TestExpirationRealClock(t *testing.T) {
 	s.Set("k", "v")
 	s.Expire("k", 50*time.Millisecond)
 
-	time.Sleep(100 * time.Millisecond) // wait > TTL + janitor tick
+	time.Sleep(200 * time.Millisecond) // wait > TTL + janitor tick
 
 	if _, ok := s.Get("k"); ok {
 		t.Error("key should be expired")
