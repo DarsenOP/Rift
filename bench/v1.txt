@@ -1,0 +1,10 @@
+goos: linux
+goarch: amd64
+pkg: github.com/DarsenOP/Rift/internal/storage
+cpu: 13th Gen Intel(R) Core(TM) i9-13980HX
+BenchmarkSet-32        	 5161022	       252.6 ns/op	     154 B/op	       2 allocs/op
+BenchmarkGetHit-32     	88412450	        14.39 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGetMiss-32    	100000000	        10.85 ns/op	       0 B/op	       0 allocs/op
+BenchmarkExpire-32     	 2480557	       513.8 ns/op	     313 B/op	       2 allocs/op
+PASS
+ok  	github.com/DarsenOP/Rift/internal/storage	6.478s
