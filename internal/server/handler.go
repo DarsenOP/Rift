@@ -4,9 +4,10 @@ import (
 	"strings"
 
 	"github.com/DarsenOP/Rift/internal/resp"
+	"github.com/DarsenOP/Rift/internal/storage"
 )
 
-func HandleCommand(value resp.Value) resp.Value {
+func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 	if len(value.Array) == 0 {
 		return resp.Value{Typ: "array", Array: []resp.Value{}}
 	}
@@ -25,6 +26,8 @@ func HandleCommand(value resp.Value) resp.Value {
 		return HandlePING(value.Array[1:])
 	case "COMMAND":
 		return HandleCOMMAND()
+	case "SET":
+		return HandleSET(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}
@@ -51,4 +54,17 @@ func HandlePING(args []resp.Value) resp.Value {
 func HandleCOMMAND() resp.Value {
 	// Return empty array for now (basic Redis compatibility)
 	return resp.Value{Typ: "array", Array: []resp.Value{}}
+}
+
+func HandleSET(store *storage.Store, args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'set' command"}
+	}
+
+	if args[0].Typ != "bulk" || args[1].Typ != "bulk" {
+		return resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"}
+	}
+
+	store.Set(args[0].Str, args[1].Str)
+	return resp.Value{Typ: "simple", Str: "OK"}
 }

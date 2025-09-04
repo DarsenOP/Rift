@@ -10,6 +10,8 @@ import (
 
 	"github.com/DarsenOP/Rift/internal/resp"
 	"github.com/DarsenOP/Rift/internal/server"
+	"github.com/DarsenOP/Rift/internal/storage"
+
 	"github.com/DarsenOP/Rift/pkg/version"
 )
 
@@ -55,6 +57,8 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
+	store := storage.New()
+
 	defer func() {
 		if err := conn.Close(); err != nil {
 			log.Printf("Error closing connection: %v", err)
@@ -85,7 +89,7 @@ func handleConnection(conn net.Conn) {
 			break
 		}
 
-		response := server.HandleCommand(value)
+		response := server.HandleCommand(store, value)
 
 		err = resp.WriteValue(conn, response)
 		if err != nil {
