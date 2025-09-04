@@ -95,12 +95,24 @@ func TestHandleCommand(t *testing.T) {
 			expected: resp.Value{Typ: "error", Str: "ERR command must be a bulk string"},
 		},
 		{
-			name: "SET OK",
+			name: "SET OK 1",
 			input: resp.Value{
 				Typ: "array",
 				Array: []resp.Value{
 					{Typ: "bulk", Str: "SET"},
 					{Typ: "bulk", Str: "mykey"},
+					{Typ: "bulk", Str: "myvalue"},
+				},
+			},
+			expected: resp.Value{Typ: "simple", Str: "OK"},
+		},
+		{
+			name: "SET OK 2",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SET"},
+					{Typ: "bulk", Str: "mykey2"},
 					{Typ: "bulk", Str: "myvalue"},
 				},
 			},
@@ -183,6 +195,60 @@ func TestHandleCommand(t *testing.T) {
 				},
 			},
 			expected: resp.Value{Typ: "error", Str: "ERR argument should be a bulk string"},
+		},
+		{
+			name: "DEL one existing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "DEL"},
+					{Typ: "bulk", Str: "mykey"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "DEL two, one missing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "DEL"},
+					{Typ: "bulk", Str: "mykey2"},
+					{Typ: "bulk", Str: "nosuch"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "DEL multiple all missing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "DEL"},
+					{Typ: "bulk", Str: "nosuch1"},
+					{Typ: "bulk", Str: "nosuch2"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "DEL no args",
+			input: resp.Value{
+				Typ:   "array",
+				Array: []resp.Value{{Typ: "bulk", Str: "DEL"}},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'del' command"},
+		},
+		{
+			name: "DEL non-bulk key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "DEL"},
+					{Typ: "integer", Num: 123},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR arguments should be bulk strings"},
 		},
 	}
 
