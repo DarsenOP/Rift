@@ -28,6 +28,8 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleCOMMAND()
 	case "SET":
 		return HandleSET(store, value.Array[1:])
+	case "GET":
+		return HandleGET(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}
@@ -67,4 +69,22 @@ func HandleSET(store *storage.Store, args []resp.Value) resp.Value {
 
 	store.Set(args[0].Str, args[1].Str)
 	return resp.Value{Typ: "simple", Str: "OK"}
+}
+
+func HandleGET(store *storage.Store, args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'get' command"}
+	}
+
+	if args[0].Typ != "bulk" {
+		return resp.Value{Typ: "error", Str: "ERR argument should be a bulk string"}
+	}
+
+	value, ok := store.Get(args[0].Str)
+
+	if !ok || value == "" {
+		return resp.Value{Typ: "null", NullTyp: "bulk"}
+	}
+
+	return resp.Value{Typ: "bulk", Str: value}
 }
