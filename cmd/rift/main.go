@@ -2,11 +2,16 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/DarsenOP/Rift/internal/resp"
 	"github.com/DarsenOP/Rift/internal/server"
@@ -37,32 +42,51 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-	defer func() {
-		if err := listener.Close(); err != nil {
-			log.Printf("Error closing listener: %v", err)
-		}
+
+	gracefulLn := server.NewGracefulListener(listener)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		log.Println(">>> Shutdown signal received, draining connections")
+		_ = gracefulLn.Listener.Close()
 	}()
 
 	fmt.Printf("Rift server v%s listening on :6380\n", version.Version)
 	fmt.Println("Ready to accept connections...")
 
 	for {
-		conn, err := listener.Accept()
+		conn, err := gracefulLn.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				break
+			}
+
 			log.Printf("Error accepting connection: %v", err)
 			continue
 		}
 		go handleConnection(conn)
 	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := gracefulLn.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Graceful shutdown error: %v", err)
+	}
+	log.Println(">>> Server exited")
 }
 
 func handleConnection(conn net.Conn) {
 	store := storage.New()
 
 	defer func() {
-		if err := conn.Close(); err != nil {
-			log.Printf("Error closing connection: %v", err)
+		if r := recover(); r != nil {
+			log.Printf("panic recovered: %v", r)
 		}
+		_ = conn.Close()
 	}()
 
 	reader := bufio.NewReader(conn)
