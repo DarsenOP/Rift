@@ -7,18 +7,15 @@ import (
 
 // Store is a simple, thread-safe in-memory string-to-string store.
 type Store struct {
-	mu   sync.RWMutex
-	data map[string]string
-	exps map[string]time.Time
-
+	mu          sync.RWMutex
+	data        map[string]*Value
 	stopJanitor chan struct{}
 }
 
 // New returns an empty Store ready for use.
 func New() *Store {
 	s := &Store{
-		data:        make(map[string]string),
-		exps:        make(map[string]time.Time),
+		data:        make(map[string]*Value),
 		stopJanitor: make(chan struct{}),
 	}
 
@@ -61,10 +58,11 @@ func (s *Store) deleteExpired() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for key, expiry := range s.exps {
-		if now.After(expiry) {
+	for key, value := range s.data {
+		expiry := getExpiry(value)
+
+		if expiry != nil && now.After(*expiry) {
 			delete(s.data, key)
-			delete(s.exps, key)
 		}
 	}
 }
@@ -74,10 +72,7 @@ func (s *Store) Set(key, value string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.data[key] = value
-
-	// Also delete the expiry if any
-	delete(s.exps, key)
+	s.data[key] = NewStringValue(value)
 }
 
 // Get returns the value and true if the key exists; otherwise (“”, false).
@@ -85,13 +80,17 @@ func (s *Store) Get(key string) (string, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if expiry, ok := s.exps[key]; ok && time.Now().After(expiry) {
+	value, exists := s.data[key]
+	if !exists || value.Type != StringType {
 		return "", false
 	}
 
-	v, ok := s.data[key]
+	// Check expiration
+	if value.String.Expiry != nil && time.Now().After(*value.String.Expiry) {
+		return "", false
+	}
 
-	return v, ok
+	return value.String.Value, true
 }
 
 // Del removes the key and returns true if it was present.
@@ -99,12 +98,10 @@ func (s *Store) Del(key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, ok := s.data[key]
+	_, exists := s.data[key]
 
 	delete(s.data, key)
-	delete(s.exps, key)
-
-	return ok
+	return exists
 }
 
 // Exists reports whether the key is present.
@@ -112,13 +109,19 @@ func (s *Store) Exists(key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if expiry, ok := s.exps[key]; ok && time.Now().After(expiry) {
+	value, exists := s.data[key]
+	if !exists {
 		return false
 	}
 
-	_, ok := s.data[key]
+	// Check expiration
+	expiry := getExpiry(value)
 
-	return ok
+	if expiry != nil && time.Now().After(*expiry) {
+		return false
+	}
+
+	return true
 }
 
 // Expire sets a TTL on an existing key. Returns true if the key exists.
@@ -126,11 +129,12 @@ func (s *Store) Expire(key string, ttl time.Duration) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.data[key]; !ok {
+	value, exists := s.data[key]
+	if !exists {
 		return false
 	}
 
-	s.exps[key] = time.Now().Add(ttl)
+	setExpiry(value, ttl)
 	return true
 }
 
@@ -143,16 +147,17 @@ func (s *Store) TTL(key string) (time.Duration, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if _, ok := s.data[key]; !ok {
-		return -2, true // Redis TTL semantic
+	value, exists := s.data[key]
+	if !exists {
+		return -2, true
 	}
 
-	exp, has := s.exps[key]
-	if !has {
+	expiry := getExpiry(value)
+	if expiry == nil {
 		return -1, true
 	}
 
-	left := time.Until(exp)
+	left := time.Until(*expiry)
 	if left < 0 {
 		return 0, true
 	}
@@ -163,6 +168,7 @@ func (s *Store) TTL(key string) (time.Duration, bool) {
 func (s *Store) SetEX(key, value string, ttl time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.data[key] = value
-	s.exps[key] = time.Now().Add(ttl)
+	strValue := NewStringValue(value)
+	setExpiry(strValue, ttl)
+	s.data[key] = strValue
 }
