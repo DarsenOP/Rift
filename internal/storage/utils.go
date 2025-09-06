@@ -11,16 +11,16 @@ var (
 )
 
 // Type checking utilities
-// func (s *Store) checkType(key string, expected DataType) (*Value, error) {
-// 	value, exists := s.data[key]
-// 	if !exists {
-// 		return nil, ErrNotFound
-// 	}
-// 	if value.Type != expected {
-// 		return nil, ErrWrongType
-// 	}
-// 	return value, nil
-// }
+func (s *Store) checkType(key string, expected DataType) (*Value, error) {
+	value, exists := s.data[key]
+	if !exists {
+		return nil, ErrNotFound
+	}
+	if value.Type != expected {
+		return nil, ErrWrongType
+	}
+	return value, nil
+}
 
 // Expiration utilities
 func setExpiry(value *Value, ttl time.Duration) {
