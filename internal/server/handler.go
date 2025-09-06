@@ -40,6 +40,18 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleTTL(store, value.Array[1:])
 	case "EXPIRE":
 		return HandleEXPIRE(store, value.Array[1:])
+	case "LPUSH":
+		return HandleLPUSH(store, value.Array[1:])
+	case "RPUSH":
+		return HandleRPUSH(store, value.Array[1:])
+	case "LPOP":
+		return HandleLPOP(store, value.Array[1:])
+	case "RPOP":
+		return HandleRPOP(store, value.Array[1:])
+	case "LRANGE":
+		return HandleLRANGE(store, value.Array[1:])
+	case "LLEN":
+		return HandleLLEN(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}

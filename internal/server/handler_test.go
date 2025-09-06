@@ -369,7 +369,216 @@ func TestHandleCommand(t *testing.T) {
 		},
 	}
 
+	listTests := []struct {
+		name     string
+		input    resp.Value
+		expected resp.Value
+	}{
+		{
+			name: "LPUSH new list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LPUSH"},
+					{Typ: "bulk", Str: "mylist"},
+					{Typ: "bulk", Str: "world"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "LPUSH multiple values",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LPUSH"},
+					{Typ: "bulk", Str: "mylist"},
+					{Typ: "bulk", Str: "hello"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 2},
+		},
+		{
+			name: "LRANGE full list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LRANGE"},
+					{Typ: "bulk", Str: "mylist"},
+					{Typ: "bulk", Str: "0"},
+					{Typ: "bulk", Str: "-1"},
+				},
+			},
+			expected: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "hello"},
+					{Typ: "bulk", Str: "world"},
+				},
+			},
+		},
+		{
+			name: "LLEN existing list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LLEN"},
+					{Typ: "bulk", Str: "mylist"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 2},
+		},
+		{
+			name: "LPOP from list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LPOP"},
+					{Typ: "bulk", Str: "mylist"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "hello"},
+		},
+		{
+			name: "RPOP from list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RPOP"},
+					{Typ: "bulk", Str: "mylist"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "world"},
+		},
+		{
+			name: "LPOP from empty list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LPOP"},
+					{Typ: "bulk", Str: "mylist"},
+				},
+			},
+			expected: resp.Value{Typ: "null", NullTyp: "bulk"},
+		},
+		{
+			name: "LLEN on non-existent key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LLEN"},
+					{Typ: "bulk", Str: "nonexistent"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "LRANGE on non-existent key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LRANGE"},
+					{Typ: "bulk", Str: "nonexistent"},
+					{Typ: "bulk", Str: "0"},
+					{Typ: "bulk", Str: "-1"},
+				},
+			},
+			expected: resp.Value{Typ: "array", Array: []resp.Value{}},
+		},
+		{
+			name: "LPUSH wrong arity",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LPUSH"},
+					{Typ: "bulk", Str: "mylist"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'LPUSH' command"},
+		},
+		{
+			name: "LRANGE wrong arity",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LRANGE"},
+					{Typ: "bulk", Str: "mylist"},
+					{Typ: "bulk", Str: "0"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'LRANGE' command"},
+		},
+		{
+			name: "LRANGE invalid indices",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LRANGE"},
+					{Typ: "bulk", Str: "mylist"},
+					{Typ: "bulk", Str: "abc"}, // Not integer
+					{Typ: "bulk", Str: "def"}, // Not integer
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR value is not an integer or out of range"},
+		},
+		// Add these to your listTests slice:
+		{
+			name: "RPUSH new list",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RPUSH"},
+					{Typ: "bulk", Str: "mylist2"},
+					{Typ: "bulk", Str: "hello"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "RPUSH multiple values",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RPUSH"},
+					{Typ: "bulk", Str: "mylist2"},
+					{Typ: "bulk", Str: "world"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 2},
+		},
+		{
+			name: "LRANGE RPUSH result",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "LRANGE"},
+					{Typ: "bulk", Str: "mylist2"},
+					{Typ: "bulk", Str: "0"},
+					{Typ: "bulk", Str: "-1"},
+				},
+			},
+			expected: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "hello"},
+					{Typ: "bulk", Str: "world"},
+				},
+			},
+		},
+	}
+
 	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HandleCommand(store, tt.input)
+
+			if !valuesEqual(result, tt.expected) {
+				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+
+	// Run the list tests
+	for _, tt := range listTests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input)
 
