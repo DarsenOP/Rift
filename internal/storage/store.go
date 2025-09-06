@@ -172,3 +172,146 @@ func (s *Store) SetEX(key, value string, ttl time.Duration) {
 	setExpiry(strValue, ttl)
 	s.data[key] = strValue
 }
+
+// List operations
+
+// LPush adds values to the left (head) of a list
+func (s *Store) LPush(key string, values ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, exists := s.data[key]
+	if exists && existing.Type != ListType {
+		return 0, ErrWrongType
+	}
+
+	if !exists {
+		s.data[key] = NewListValue(values)
+		return len(values), nil
+	}
+
+	// Prepend new values to existing list
+	existing.List.Values = append(values, existing.List.Values...)
+	return len(existing.List.Values), nil
+}
+
+// RPush adds values to the right (tail) of a list
+func (s *Store) RPush(key string, values ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, exists := s.data[key]
+	if exists && existing.Type != ListType {
+		return 0, ErrWrongType
+	}
+
+	if !exists {
+		s.data[key] = NewListValue(values)
+		return len(values), nil
+	}
+
+	// Append new values to existing list
+	existing.List.Values = append(existing.List.Values, values...)
+	return len(existing.List.Values), nil
+}
+
+// LPop removes and returns the leftmost (head) element of a list
+func (s *Store) LPop(key string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	value, err := s.checkType(key, ListType)
+	if err != nil {
+		return "", err
+	}
+
+	if len(value.List.Values) == 0 {
+		return "", nil // Redis returns nil for empty list
+	}
+
+	// Remove and return first element
+	popped := value.List.Values[0]
+	value.List.Values = value.List.Values[1:]
+
+	// Clean up empty list
+	if len(value.List.Values) == 0 {
+		delete(s.data, key)
+	}
+
+	return popped, nil
+}
+
+// RPop removes and returns the rightmost (tail) element of a list
+func (s *Store) RPop(key string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	value, err := s.checkType(key, ListType)
+	if err != nil {
+		return "", err
+	}
+
+	if len(value.List.Values) == 0 {
+		return "", nil
+	}
+
+	// Remove and return last element
+	lastIndex := len(value.List.Values) - 1
+	popped := value.List.Values[lastIndex]
+	value.List.Values = value.List.Values[:lastIndex]
+
+	// Clean up empty list
+	if len(value.List.Values) == 0 {
+		delete(s.data, key)
+	}
+
+	return popped, nil
+}
+
+// LRange returns a range of elements from the list
+func (s *Store) LRange(key string, start, stop int) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, err := s.checkType(key, ListType)
+	if err != nil {
+		return nil, err
+	}
+
+	list := value.List.Values
+	length := len(list)
+
+	// Handle negative indices (Redis behavior)
+	if start < 0 {
+		start = length + start
+	}
+	if stop < 0 {
+		stop = length + stop
+	}
+
+	// Clamp indices to valid range
+	if start < 0 {
+		start = 0
+	}
+	if stop >= length {
+		stop = length - 1
+	}
+	if start > stop {
+		return []string{}, nil
+	}
+
+	return list[start : stop+1], nil
+}
+
+// LLen returns the length of a list
+func (s *Store) LLen(key string) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	value, err := s.checkType(key, ListType)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(value.List.Values), nil
+}
