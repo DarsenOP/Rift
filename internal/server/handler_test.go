@@ -1,6 +1,7 @@
 package server
 
 import (
+	"maps"
 	"strconv"
 	"testing"
 
@@ -790,6 +791,137 @@ func TestHandleCommand(t *testing.T) {
 		},
 	}
 
+	setTests := []struct {
+		name     string
+		prep     func(*storage.Store)
+		input    resp.Value
+		expected resp.Value
+	}{
+		{
+			name: "SADD new set single member",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SADD"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "a"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "SADD multi-member",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SADD"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "b"},
+					{Typ: "bulk", Str: "c"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 2},
+		},
+		{
+			name: "SCARD",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SCARD"},
+					{Typ: "bulk", Str: "s1"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 3},
+		},
+		{
+			name: "SISMEMBER true",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SISMEMBER"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "b"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "SISMEMBER false",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SISMEMBER"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "z"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "SMEMBERS",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SMEMBERS"},
+					{Typ: "bulk", Str: "s1"},
+				},
+			},
+			expected: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{ // order not guaranteed – your test helper can use a set comparison
+					{Typ: "bulk", Str: "a"},
+					{Typ: "bulk", Str: "b"},
+					{Typ: "bulk", Str: "c"},
+				},
+			},
+		},
+		{
+			name: "SREM",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SREM"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "b"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "SINTER",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SINTER"},
+					{Typ: "bulk", Str: "s1"},
+					{Typ: "bulk", Str: "s2"},
+				},
+			},
+			// pre-seed s2 with {a,c} so intersection is {a,c}
+			prep: func(s *storage.Store) {
+				_, _ = s.SAdd("s2", "a", "c", "d")
+			},
+			expected: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "a"},
+					{Typ: "bulk", Str: "c"},
+				},
+			},
+		},
+		{
+			name: "SCARD non-existing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "SCARD"},
+					{Typ: "bulk", Str: "ghost"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input)
@@ -816,7 +948,21 @@ func TestHandleCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input) // your helper that parses & dispatches
 
-			if !valuesEqual(result, tt.expected) {
+			if !valuesEqual(result, tt.expected, false) {
+				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+
+	for _, tt := range setTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.prep != nil {
+				tt.prep(store)
+			}
+
+			result := HandleCommand(store, tt.input)
+
+			if !valuesEqual(result, tt.expected, false) {
 				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
 			}
 		})
@@ -937,7 +1083,12 @@ func TestTTLExpire(t *testing.T) {
 }
 
 // Helper function from parser_test.go
-func valuesEqual(a, b resp.Value) bool {
+func valuesEqual(a, b resp.Value, checkOrder ...bool) bool {
+	order := true
+	if len(checkOrder) > 0 {
+		order = checkOrder[0]
+	}
+
 	if a.Typ != b.Typ {
 		return false
 	}
@@ -953,6 +1104,19 @@ func valuesEqual(a, b resp.Value) bool {
 		if len(a.Array) != len(b.Array) {
 			return false
 		}
+
+		if !order { // still false -> all bulk
+			setA := make(map[string]int) // counts for duplicates
+			setB := make(map[string]int)
+			for _, v := range a.Array {
+				setA[v.Str]++
+			}
+			for _, v := range b.Array {
+				setB[v.Str]++
+			}
+			return maps.Equal(setA, setB) // go 1.21+, or write a tiny loop
+		}
+
 		for i := range a.Array {
 			if !valuesEqual(a.Array[i], b.Array[i]) {
 				return false
