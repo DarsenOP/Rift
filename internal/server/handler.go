@@ -40,6 +40,48 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleTTL(store, value.Array[1:])
 	case "EXPIRE":
 		return HandleEXPIRE(store, value.Array[1:])
+	case "LPUSH":
+		return HandleLPUSH(store, value.Array[1:])
+	case "RPUSH":
+		return HandleRPUSH(store, value.Array[1:])
+	case "LPOP":
+		return HandleLPOP(store, value.Array[1:])
+	case "RPOP":
+		return HandleRPOP(store, value.Array[1:])
+	case "LRANGE":
+		return HandleLRANGE(store, value.Array[1:])
+	case "LLEN":
+		return HandleLLEN(store, value.Array[1:])
+	case "HSET":
+		return HandleHSET(store, value.Array[1:])
+	case "HGET":
+		return HandleHGET(store, value.Array[1:])
+	case "HGETALL":
+		return HandleHGETALL(store, value.Array[1:])
+	case "HDEL":
+		return HandleHDEL(store, value.Array[1:])
+	case "HEXISTS":
+		return HandleHEXISTS(store, value.Array[1:])
+	case "HLEN":
+		return HandleHLEN(store, value.Array[1:])
+	case "SADD":
+		return HandleSADD(store, value.Array[1:])
+	case "SREM":
+		return HandleSREM(store, value.Array[1:])
+	case "SISMEMBER":
+		return HandleSISMEMBER(store, value.Array[1:])
+	case "SMEMBERS":
+		return HandleSMEMBERS(store, value.Array[1:])
+	case "SCARD":
+		return HandleSCARD(store, value.Array[1:])
+	case "SINTER":
+		return HandleSINTER(store, value.Array[1:])
+	case "TYPE":
+		return HandleTYPE(store, value.Array[1:])
+	case "RENAME":
+		return HandleRENAME(store, value.Array[1:])
+	case "RENAMENX":
+		return HandleRENAMENX(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}

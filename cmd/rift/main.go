@@ -81,6 +81,7 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	store := storage.New()
+	defer store.Shutdown()
 
 	defer func() {
 		if r := recover(); r != nil {
