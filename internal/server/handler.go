@@ -76,6 +76,12 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleSCARD(store, value.Array[1:])
 	case "SINTER":
 		return HandleSINTER(store, value.Array[1:])
+	case "TYPE":
+		return HandleTYPE(store, value.Array[1:])
+	case "RENAME":
+		return HandleRENAME(store, value.Array[1:])
+	case "RENAMENX":
+		return HandleRENAMENX(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}

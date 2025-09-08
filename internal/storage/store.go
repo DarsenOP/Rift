@@ -553,3 +553,44 @@ func (s *Store) SInter(keys ...string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// TYPE key  → "string" | "list" | "hash" | "set" | "none"
+func (s *Store) Type(key string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.data[key]
+	if !ok {
+		return "none"
+	}
+	return string(v.Type)
+}
+
+// RENAME key newKey  (overwrites dest)
+func (s *Store) Rename(key, newKey string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.data[key]
+	if !ok {
+		return ErrNotFound
+	}
+	// copy expiry pointer (shallow copy is fine – expiry is immutable once set)
+	s.data[newKey] = v
+	delete(s.data, key)
+	return nil
+}
+
+// RENAMENX key newKey  (fails if dest exists)
+func (s *Store) RenameNX(key, newKey string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.data[key]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if _, exists := s.data[newKey]; exists {
+		return false, nil
+	}
+	s.data[newKey] = v
+	delete(s.data, key)
+	return true, nil
+}
