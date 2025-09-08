@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -314,4 +315,109 @@ func (s *Store) LLen(key string) (int, error) {
 	}
 
 	return len(value.List.Values), nil
+}
+
+// --- Hash operations --------------------------------------------------------
+
+func (s *Store) HSet(key string, fieldVals ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(fieldVals)%2 != 0 {
+		return 0, errors.New("wrong number of arguments for HSET")
+	}
+
+	// Create or load hash
+	v, exists := s.data[key]
+	if !exists {
+		v = NewHashValue(nil)
+		s.data[key] = v
+	}
+	if v.Type != HashType {
+		return 0, ErrWrongType
+	}
+	if v.Hash.Fields == nil {
+		v.Hash.Fields = make(map[string]string)
+	}
+
+	added := 0
+	for i := 0; i < len(fieldVals); i += 2 {
+		field, val := fieldVals[i], fieldVals[i+1]
+		if _, ok := v.Hash.Fields[field]; !ok {
+			added++
+		}
+		v.Hash.Fields[field] = val
+	}
+	return added, nil
+}
+
+func (s *Store) HGet(key, field string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, HashType)
+	if err != nil {
+		return "", err
+	}
+	val, ok := v.Hash.Fields[field]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return val, nil
+}
+
+func (s *Store) HGetAll(key string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, HashType)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(v.Hash.Fields)*2)
+	for f, val := range v.Hash.Fields {
+		out = append(out, f, val)
+	}
+	return out, nil
+}
+
+func (s *Store) HDel(key string, fields ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, err := s.checkType(key, HashType)
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, f := range fields {
+		if _, ok := v.Hash.Fields[f]; ok {
+			delete(v.Hash.Fields, f)
+			removed++
+		}
+	}
+	return removed, nil
+}
+
+func (s *Store) HExists(key, field string) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, HashType)
+	if err != nil {
+		return false, err
+	}
+	_, ok := v.Hash.Fields[field]
+	return ok, nil
+}
+
+func (s *Store) HLen(key string) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, HashType)
+	if err != nil {
+		return 0, err
+	}
+	return len(v.Hash.Fields), nil
 }
