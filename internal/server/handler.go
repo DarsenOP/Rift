@@ -64,6 +64,18 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleHEXISTS(store, value.Array[1:])
 	case "HLEN":
 		return HandleHLEN(store, value.Array[1:])
+	case "SADD":
+		return HandleSADD(store, value.Array[1:])
+	case "SREM":
+		return HandleSREM(store, value.Array[1:])
+	case "SISMEMBER":
+		return HandleSISMEMBER(store, value.Array[1:])
+	case "SMEMBERS":
+		return HandleSMEMBERS(store, value.Array[1:])
+	case "SCARD":
+		return HandleSCARD(store, value.Array[1:])
+	case "SINTER":
+		return HandleSINTER(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}
