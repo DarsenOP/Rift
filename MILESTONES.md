@@ -79,21 +79,21 @@
 
 ## Milestone 5: Advanced Data Types & Commands - IN PROGRESS ⏳
 
-### Planned Features:
+### What was accomplished
 
-- Refactor storage to support multiple data types (`map[string]interface{}`)
-- List commands: LPUSH, RPUSH, LPOP, RPOP, LRANGE, LLEN
-- Hash commands: HSET, HGET, HGETALL, HDEL, HEXISTS, HLEN
-- Set commands: SADD, SMEMBERS, SISMEMBER, SREM, SCARD, SINTER
-- Type commands: TYPE, RENAME, RENAMENX
+| Data-type | Commands (Redis-compatible)                           | Status |
+| --------- | ----------------------------------------------------- | ------ |
+| **List**  | `LPUSH` `RPUSH` `LPOP` `RPOP` `LRANGE` `LLEN`         | ✅      |
+| **Hash**  | `HSET` `HGET` `HGETALL` `HDEL` `HEXISTS` `HLEN`       | ✅      |
+| **Set**   | `SADD` `SREM` `SISMEMBER` `SMEMBERS` `SCARD` `SINTER` | ✅      |
+| **Meta**  | `TYPE` `RENAME` `RENAMENX`                            | ✅      |
 
-### Expected Branches:
+### Key Features
 
-- `feat/data-types-refactor`
-- `feat/list-commands`
-- `feat/hash-commands`
-- `feat/set-commands`
-- `feat/type-commands`
+- Pluggable type system – unified `Value` union cleanly separates `string`, `list`, `hash`, `set` while sharing expiry and locking logic
+- Zero-copy reads – bulk strings returned directly from internal maps/slices, no extra allocations on hot path
+- Type-safe command matrix – every handler uses `checkType()` to guarantee `WRONGTYPE` errors match Redis behaviour
+- Order-agnostic test helpers – reusable `valuesEqual(..., false)` for `SMEMBERS`, `SINTER`, `HGETALL` where order is undefined
 
 ## Milestone 6: Persistence & Recovery - PLANNED 📅
 
