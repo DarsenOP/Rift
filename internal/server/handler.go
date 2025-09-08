@@ -52,6 +52,18 @@ func HandleCommand(store *storage.Store, value resp.Value) resp.Value {
 		return HandleLRANGE(store, value.Array[1:])
 	case "LLEN":
 		return HandleLLEN(store, value.Array[1:])
+	case "HSET":
+		return HandleHSET(store, value.Array[1:])
+	case "HGET":
+		return HandleHGET(store, value.Array[1:])
+	case "HGETALL":
+		return HandleHGETALL(store, value.Array[1:])
+	case "HDEL":
+		return HandleHDEL(store, value.Array[1:])
+	case "HEXISTS":
+		return HandleHEXISTS(store, value.Array[1:])
+	case "HLEN":
+		return HandleHLEN(store, value.Array[1:])
 	default:
 		return resp.Value{Typ: "error", Str: "ERR unknown command '" + command.Str + "'"}
 	}

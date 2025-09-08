@@ -567,6 +567,229 @@ func TestHandleCommand(t *testing.T) {
 		},
 	}
 
+	hashTests := []struct {
+		name     string
+		input    resp.Value
+		expected resp.Value
+	}{
+		{
+			name: "HSET new hash single field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HSET"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "name"},
+					{Typ: "bulk", Str: "alice"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "HSET existing hash overwrite field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HSET"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "name"},
+					{Typ: "bulk", Str: "bob"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0}, // 0 = field already existed
+		},
+		{
+			name: "HSET multi-field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HSET"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "age"},
+					{Typ: "bulk", Str: "30"},
+					{Typ: "bulk", Str: "city"},
+					{Typ: "bulk", Str: "NYC"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 2}, // age & city are new
+		},
+		{
+			name: "HGET existing field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HGET"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "name"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "bob"},
+		},
+		{
+			name: "HGET non-existing field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HGET"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "missing"},
+				},
+			},
+			expected: resp.Value{Typ: "null", NullTyp: "bulk"},
+		},
+		{
+			name: "HGETALL",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HGETALL"},
+					{Typ: "bulk", Str: "user:1"},
+				},
+			},
+			expected: resp.Value{
+				Typ: "array",
+				// order not guaranteed; we accept any order in the checker
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "name"},
+					{Typ: "bulk", Str: "bob"},
+					{Typ: "bulk", Str: "age"},
+					{Typ: "bulk", Str: "30"},
+					{Typ: "bulk", Str: "city"},
+					{Typ: "bulk", Str: "NYC"},
+				},
+			},
+		},
+		{
+			name: "HLEN",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HLEN"},
+					{Typ: "bulk", Str: "user:1"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 3},
+		},
+		{
+			name: "HEXISTS true",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HEXISTS"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "age"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "HEXISTS false",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HEXISTS"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "missing"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "HDEL single field",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HDEL"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "city"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "HDEL multi-field (some missing)",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HDEL"},
+					{Typ: "bulk", Str: "user:1"},
+					{Typ: "bulk", Str: "age"},
+					{Typ: "bulk", Str: "phantom"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1}, // only age existed
+		},
+		{
+			name: "HLEN after HDEL",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HLEN"},
+					{Typ: "bulk", Str: "user:1"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1}, // only name left
+		},
+		{
+			name: "HGETALL non-existing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HGETALL"},
+					{Typ: "bulk", Str: "ghost"},
+				},
+			},
+			expected: resp.Value{Typ: "array", Array: []resp.Value{}},
+		},
+		{
+			name: "HLEN non-existing key",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HLEN"},
+					{Typ: "bulk", Str: "ghost"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+		{
+			name: "HSET wrong arity (odd number of fv pairs)",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HSET"},
+					{Typ: "bulk", Str: "k"},
+					{Typ: "bulk", Str: "f1"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'HSET' command"},
+		},
+		{
+			name: "HGET wrong arity",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HGET"},
+					{Typ: "bulk", Str: "k"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'HGET' command"},
+		},
+		{
+			name: "HSET on wrong type (list) – now hash cmd",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "HSET"},
+					{Typ: "bulk", Str: "mylist2"},
+					{Typ: "bulk", Str: "f"},
+					{Typ: "bulk", Str: "v"},
+				},
+			},
+			expected: resp.Value{Typ: "error", Str: "WRONGTYPE Operation against a key holding the wrong kind of value"},
+		},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input)
@@ -581,6 +804,17 @@ func TestHandleCommand(t *testing.T) {
 	for _, tt := range listTests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input)
+
+			if !valuesEqual(result, tt.expected) {
+				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+
+	// Run the hash tests
+	for _, tt := range hashTests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HandleCommand(store, tt.input) // your helper that parses & dispatches
 
 			if !valuesEqual(result, tt.expected) {
 				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
