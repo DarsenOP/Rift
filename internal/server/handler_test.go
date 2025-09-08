@@ -922,6 +922,71 @@ func TestHandleCommand(t *testing.T) {
 		},
 	}
 
+	typeTests := []struct {
+		name     string
+		prep     func(*storage.Store)
+		input    resp.Value
+		expected resp.Value
+	}{
+		{
+			name: "TYPE string",
+			prep: func(s *storage.Store) { s.Set("k", "hello") },
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TYPE"}, {Typ: "bulk", Str: "k"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "string"},
+		},
+		{
+			name: "TYPE non-existing",
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "TYPE"}, {Typ: "bulk", Str: "ghost"},
+				},
+			},
+			expected: resp.Value{Typ: "bulk", Str: "none"},
+		},
+		{
+			name: "RENAME",
+			prep: func(s *storage.Store) { s.Set("old", "val") },
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RENAME"}, {Typ: "bulk", Str: "old"}, {Typ: "bulk", Str: "new"},
+				},
+			},
+			expected: resp.Value{Typ: "simple", Str: "OK"},
+		},
+		{
+			name: "RENAMENX success",
+			prep: func(s *storage.Store) { s.Set("a", "1") },
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RENAMENX"}, {Typ: "bulk", Str: "a"}, {Typ: "bulk", Str: "b"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 1},
+		},
+		{
+			name: "RENAMENX fail dest exists",
+			prep: func(s *storage.Store) {
+				s.Set("x", "1")
+				s.Set("y", "2")
+			},
+			input: resp.Value{
+				Typ: "array",
+				Array: []resp.Value{
+					{Typ: "bulk", Str: "RENAMENX"}, {Typ: "bulk", Str: "x"}, {Typ: "bulk", Str: "y"},
+				},
+			},
+			expected: resp.Value{Typ: "integer", Num: 0},
+		},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := HandleCommand(store, tt.input)
@@ -955,6 +1020,20 @@ func TestHandleCommand(t *testing.T) {
 	}
 
 	for _, tt := range setTests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.prep != nil {
+				tt.prep(store)
+			}
+
+			result := HandleCommand(store, tt.input)
+
+			if !valuesEqual(result, tt.expected, false) {
+				t.Errorf("HandleCommand() = %+v, want %+v", result, tt.expected)
+			}
+		})
+	}
+
+	for _, tt := range typeTests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.prep != nil {
 				tt.prep(store)
