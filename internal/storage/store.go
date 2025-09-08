@@ -421,3 +421,135 @@ func (s *Store) HLen(key string) (int, error) {
 	}
 	return len(v.Hash.Fields), nil
 }
+
+// --- Set operations ---------------------------------------------------------
+
+func (s *Store) SAdd(key string, members ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, exists := s.data[key]
+	if !exists {
+		v = NewSetValue(nil)
+		s.data[key] = v
+	}
+	if v.Type != SetType {
+		return 0, ErrWrongType
+	}
+	if v.Set.Members == nil {
+		v.Set.Members = make(map[string]struct{})
+	}
+	added := 0
+	for _, m := range members {
+		if _, ok := v.Set.Members[m]; !ok {
+			v.Set.Members[m] = struct{}{}
+			added++
+		}
+	}
+	return added, nil
+}
+
+func (s *Store) SRem(key string, members ...string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	v, err := s.checkType(key, SetType)
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, m := range members {
+		if _, ok := v.Set.Members[m]; ok {
+			delete(v.Set.Members, m)
+			removed++
+		}
+	}
+	return removed, nil
+}
+
+func (s *Store) SIsMember(key, member string) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, SetType)
+	if err != nil {
+		return false, err
+	}
+	_, ok := v.Set.Members[member]
+	return ok, nil
+}
+
+func (s *Store) SMembers(key string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, SetType)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(v.Set.Members))
+	for m := range v.Set.Members {
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+func (s *Store) SCard(key string) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	v, err := s.checkType(key, SetType)
+	if err != nil {
+		if err == ErrNotFound {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return len(v.Set.Members), nil
+}
+
+// SInter returns the intersection of the given sets.
+// If any key does not exist it is considered empty.
+func (s *Store) SInter(keys ...string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	// Build a slice of maps (nil = empty set)
+	maps := make([]map[string]struct{}, 0, len(keys))
+	for _, k := range keys {
+		v, ok := s.data[k]
+		if !ok || v.Type != SetType {
+			maps = append(maps, nil)
+			continue
+		}
+		maps = append(maps, v.Set.Members)
+	}
+	// Find smallest map to iterate over it
+	minIdx := 0
+	for i, m := range maps {
+		if m == nil {
+			return []string{}, nil // intersection with empty set
+		}
+		if len(m) < len(maps[minIdx]) {
+			minIdx = i
+		}
+	}
+	// Check each member of the smallest map against all others
+	out := make([]string, 0, len(maps[minIdx]))
+	for member := range maps[minIdx] {
+		ok := true
+		for _, m := range maps {
+			if _, exists := m[member]; !exists {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			out = append(out, member)
+		}
+	}
+	return out, nil
+}
